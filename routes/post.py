@@ -40,14 +40,33 @@ def update_post(post:PostUpdate, post_id:int, current_user:Annotated[User, Depen
     db.commit()
     db.refresh(db_post)
     return db_post
-# @router.delete("/deleteAllPost")
-# def delete_all_post():
 
-# @router.delete("/deletePost/{post_id}")
-# def delete_post():
+    
+@router.delete("/deleteAllPost")
+def delete_all_post(current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    db.query(Post).filter(Post.user_id==current_user.id).delete()
+    db.commit()
+    return {"message": "All posts deleted"}
 
-# @router.get("/getAllPost")
-# def get_all_post():
+@router.delete("/deletePost/{post_id}")
+def delete_post(post_id:int, current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    db_post = db.query(Post).filter(Post.id==post_id).first()
+    if not db_post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if db_post.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You don't have permission to delete this post")
+    db.delete(db_post)
+    db.commit()
+    return {"message": "Post deleted"}
 
-# @router.get("/getPost/{post_id}")
-# def get_post():
+@router.get("/getAllPost")
+def get_all_post(current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    db_post = db.query(Post).filter(Post.user_id==current_user.id).all()
+    return db_post
+
+@router.get("/getPost/{post_id}")
+def get_post(post_id:int, current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    db_post = db.query(Post).filter(Post.id==post_id).first()
+    if not db_post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return db_post
