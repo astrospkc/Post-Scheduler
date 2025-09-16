@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from models.user import User
 from schemas.user import UserCreate , UserUpdate, UserOut
+import crud
 
 router = APIRouter()
 
@@ -15,13 +16,10 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/", response_model=UserOut)
-async def create_user(user:UserCreate, db:Session = Depends(get_db)):
-    db_user = User(name=user.name, email=user.email, password=user.password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+# @router.post("/", response_model=UserOut)
+# async def create_user(user:UserCreate, db:Session = Depends(get_db)):
+#     db_user = crud.create_user(db=db, user=user)
+#     return db_user
 
 @router.get("/{user_id}", response_model=UserOut)
 async def read_user(user_id:int, db:Session = Depends(get_db)):
