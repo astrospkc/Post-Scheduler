@@ -7,14 +7,13 @@ from models.user import User
 from schemas.user import UserOut, UserCreate
 from core.security import verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from database import SessionLocal
+from database import get_db
+from core.security import get_current_active_user
 import core
+from typing import Annotated
+from pydantic import BaseModel
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 router = APIRouter()
@@ -31,7 +30,7 @@ def register(user:UserCreate, db:Session=Depends(get_db)):
     print("new_user: ", new_user)
     # jwt payload
     data = {  
-            "sub": new_user.id,
+            "sub":str(new_user.id),
             "name":new_user.name,
             "email":new_user.email}
     access_token = create_access_token(data, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
@@ -45,9 +44,9 @@ def register(user:UserCreate, db:Session=Depends(get_db)):
     }}
 
 # login user 
-@router.post("/token")
+@router.post("/login")
 def login(form_data:OAuth2PasswordRequestForm=Depends(), db:Session=Depends(get_db)):
-    user = crud.get_user_by_email(db=db, email=form_data.email)
+    user = crud.get_user_by_email(db=db, email=form_data.username)
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect email ")
     if not verify_password(form_data.password, user.password):
@@ -55,7 +54,7 @@ def login(form_data:OAuth2PasswordRequestForm=Depends(), db:Session=Depends(get_
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
-            "sub": user.id,
+            "sub": str(user.id),
             "name":user.name,
             "email":user.email
         }, expires_delta=access_token_expires
@@ -67,26 +66,30 @@ def login(form_data:OAuth2PasswordRequestForm=Depends(), db:Session=Depends(get_
         "id": user.id,
         "name": user.name,
         "email": user.email,
-        "full_name": user.full_name
+        
     }}
 
+@router.get("/me", response_model=UserOut)
+async def read_users_me(current_user:Annotated[User, Depends(get_current_active_user)]):
+    print("user: ", current_user, current_user.id)
+    return current_user
 
 # # Protected route 
 # @router.get("/me", response_model=UserOut)
 # def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    import jwt
-    from core.security import SECRET_KEY, ALGORITHM
-    from jwt.exceptions import InvalidTokenError
+    # import jwt
+    # from core.security import SECRET_KEY, ALGORITHM
+    # from jwt.exceptions import InvalidTokenError
 
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        name: str = payload.get("sub")
-        if name is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    # try:
+    #     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    #     name: str = payload.get("sub")
+    #     if name is None:
+    #         raise HTTPException(status_code=401, detail="Invalid token")
+    # except InvalidTokenError:
+    #     raise HTTPException(status_code=401, detail="Invalid token")
     
-    user = crud.get_user_by_name(db, name)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+    # user = crud.get_user_by_name(db, name)
+    # if not user:
+    #     raise HTTPException(status_code=404, detail="User not found")
+    # return user
