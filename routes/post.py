@@ -27,9 +27,19 @@ async def create_post( post:PostCreate,current_user:Annotated[User, Depends(get_
     db.refresh(db_post)
     return db_post
 
-# @router.put("/updatePost/{post_id}")
-# def update_post():
-
+@router.put("/updatePost/{post_id}", response_model=PostUpdate, status_code=status.HTTP_201_CREATED)
+def update_post(post:PostUpdate, post_id:int, current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
+    db_post = db.query(Post).filter(Post.id==post_id).first()
+    print("db_post: ", db_post)
+    if not db_post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if db_post.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You don't have permission to update this post")
+    db_post.title = post.title if post.title else db_post.title
+    db_post.description = post.description if post.description else db_post.description
+    db.commit()
+    db.refresh(db_post)
+    return db_post
 # @router.delete("/deleteAllPost")
 # def delete_all_post():
 
