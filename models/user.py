@@ -1,7 +1,8 @@
 # models/user.py
-from sqlalchemy import String, Integer
+from sqlalchemy import String, Integer, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from database import Base
+from sqlalchemy.orm import relationship
 
 
 class User(Base):
@@ -11,3 +12,5 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     password: Mapped[str] = mapped_column(String(128), nullable=False)
+    posts = relationship("Post", back_populates="user")
+

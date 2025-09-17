@@ -6,6 +6,10 @@ from models.post import Post
 from schemas.post import PostCreate, PostUpdate , PostOut
 from core.security import get_current_active_user
 from models.user import User
+from datetime import datetime
+from datetime import timezone
+import pytz
+from scheduler import scheduled_post_job, get_all_jobs, delete_all_jobs
 router = APIRouter()
 def get_db():
     db = SessionLocal()
@@ -20,12 +24,35 @@ def get_db():
 async def create_post( post:PostCreate,current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
     print("current user: ", current_user)
     current_user_id = current_user.id
-    print("current user id: ", current_user_id)
-    db_post = Post(**post.dict(), user_id=current_user_id)
-    db.add(db_post)
-    db.commit()
-    db.refresh(db_post)
-    return db_post
+    print("current user id: ", current_user_id) 
+    ist = pytz.timezone('Asia/Kolkata')
+    if post.scheduled_time.tzinfo is None:
+    # naive datetime, localize it
+        post_scheduled_time_ist = ist.localize(post.scheduled_time)
+    else:
+    # aware datetime, convert timezone
+        post_scheduled_time_ist = post.scheduled_time.astimezone(ist)
+
+    print("scheduled time and now time: ",post.scheduled_time, post_scheduled_time_ist, datetime.now(ist))
+    if(post_scheduled_time_ist > datetime.now(ist)):
+        db_post = Post(**post.dict(), user_id=current_user_id)
+        db.add(db_post)
+        db.commit()
+        db.refresh(db_post)
+        scheduled_post_job(db_post.id, post_scheduled_time_ist)
+        return db_post
+    else:
+        raise HTTPException(status_code=400, detail="Scheduled time must be in the future")
+
+@router.get("/getAllJobs")
+def getAllJobs():
+    jobs = get_all_jobs()
+    # print("jobs: ", jobs)
+    return jobs
+@router.delete("/deleteAllJobs")
+def deleteAllJobs(db:Session=Depends(get_db)):
+    msg =delete_all_jobs()
+    return msg
 
 @router.put("/updatePost/{post_id}", response_model=PostUpdate, status_code=status.HTTP_201_CREATED)
 def update_post(post:PostUpdate, post_id:int, current_user:Annotated[User, Depends(get_current_active_user)], db:Session = Depends(get_db)):
